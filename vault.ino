@@ -17,17 +17,23 @@ Keypad keypad = Keypad(makeKeymap(keys), rowPins, colPins, 4, 4);
 
 int numberAddress = 0;
 int resetButton = 0;
-int code = 1234;
+int code = 0;
 int displayedNumber = 0;
 
 int buzzerPin = 3;
 int resetButtonPin = 4;
 
-void input()
+void input(char keyPressed)
 {
-  tone(buzzerPin, 1760);
-  delay(150);
-  noTone(buzzerPin);
+  if (keyPressed >= '0' && keyPressed <= '9')
+  {
+    displayedNumber = displayedNumber * 10 + (keyPressed - '0');
+    screenStatus("on");
+   
+    tone(buzzerPin, 1760);
+    delay(150);
+    noTone(buzzerPin);
+  }
 }
 
 void error()
@@ -58,6 +64,17 @@ void correct()
   clearScreen();
 }
 
+void reset()
+{
+  screenStatus("on");
+  for (int i = 0; i < 2; i++)
+  {
+    tone(buzzerPin, 1560);
+    delay(700);
+    noTone(buzzerPin);
+  }
+}
+
 void clearScreen()
 {
   displayedNumber = 0;
@@ -80,8 +97,7 @@ void setup()
   pinMode(buzzerPin, OUTPUT);
   pinMode(resetButtonPin, INPUT_PULLUP);
 
-  /* GET number from memory */
-  // EEPROM.get(numberAddress, code);
+  EEPROM.get(numberAddress, code);
 }
 
 void screenStatus(String status)
@@ -101,6 +117,7 @@ void screenStatus(String status)
 void loop()
 {
   char keyPressed = keypad.getKey();
+
   if (displayedNumber >= 1000)
   {
     if (displayedNumber == code)
@@ -108,30 +125,32 @@ void loop()
     else
       error();
   }
-  if (keyPressed >= '0' && keyPressed <= '9')
-  {
 
-    displayedNumber = displayedNumber * 10 + (keyPressed - '0');
-    screenStatus("on");
-    input();
-  }
+  input(keyPressed);
 
-  if (displayedNumber != 0 && keyPressed == 'C')
-    error();
+if (displayedNumber != 0 && keyPressed == 'C')
+  error();
 
+resetButton = digitalRead(resetButtonPin);
+
+// If resetButton is hold down for 3 seconds, reset the code
+if (resetButton == 0)
+{
+  delay(3000);
   resetButton = digitalRead(resetButtonPin);
-
-  // If resetButton is hold down for 3 seconds, reset the code
   if (resetButton == 0)
   {
-    delay(3000);
-    resetButton = digitalRead(resetButtonPin);
-    if (resetButton == 0)
+    // Blink the screen while resetting the code, one the user has entered the new code, the code will be saved and the screen will stop blinking
+    displayedNumber = 0;
+    reset();
+    while (displayedNumber <= 1000)
     {
-      clearScreen();
-      code = 2345;
-      EEPROM.put(numberAddress, code);
-      Serial.println("Code reset to 1234");
+      char keyPressed = keypad.getKey();
+      input(keyPressed);
     }
   }
+  code = displayedNumber;
+  EEPROM.put(numberAddress, code);
+  correct();
+}
 }
